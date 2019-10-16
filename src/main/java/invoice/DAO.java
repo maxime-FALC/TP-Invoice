@@ -80,12 +80,30 @@ public class DAO {
 		throws Exception {
 		
             int IDCustomer = customer.getCustomerId(); // ID du client
+            ResultSet result; //clef générée lors de la création de la facture
+            int item =1; // clef primaire du numéro de ligne (première ligne)
+            int clef; // clé de la commande
+            int cout; // cout total d'une commande de n produits
             
             // commande d'insertion de la facture
-            String sql = "INSERT INTO Invoice(CustomerID) VALUES(?)";
+            String sqlInvoice = "INSERT INTO Invoice(CustomerID) VALUES(?)";
+            
+            String sqlItem = "INSERT INTO Item VALUES(?, ?, ?, ?, ?)";
+            
+            String sqlCout = "SELECT Price FROM Product WHERE ID = ? ";
                         
 		try (Connection connection = myDataSource.getConnection();
-			PreparedStatement stmt = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+			PreparedStatement stmt = 
+                                connection.prepareStatement(
+                                        sqlInvoice, 
+                                        Statement.RETURN_GENERATED_KEYS);
+                        PreparedStatement stmtItem = 
+                                connection.prepareStatement(sqlItem);
+                        PreparedStatement stmtCout =
+                                connection.prepareStatement(sqlCout)){
+                    
+                    
+                    connection.setAutoCommit(false);
                     
 			stmt.setInt(1, IDCustomer);
                         
@@ -94,9 +112,54 @@ public class DAO {
                         if(rs != 1){
                             throw new IllegalArgumentException();
                         }
+                        
+                        // Les clefs autogénérées sont retournées sous forme de
+                        // ResultSet, car il se peut qu'une requête génère
+                        // plusieurs clés
+                        result = stmt.getGeneratedKeys(); 
+                        
+                        result.next(); // On lit la première clé générée
+                        
+                        
+                        // Récupération de la clé 
+                        clef = result.getInt(1);
+                        System.out.println("La première clef autogénérée vaut " 
+                                + clef);
+                        // Les clés auto-générées sont en général des entiers
+                        
+                        
+                        for(int i =0; i < productIDs.length; i++){
+                
+                            // Récupération du prix
+                            stmtCout.setInt(1, productIDs[i]);
+                            result = stmtCout.executeQuery();
+                            result.next();
+                            cout = result.getInt("Price");
+                            
+                            
+                            stmtItem.setInt(1, clef);
+                            stmtItem.setInt(2, item);
+                            stmtItem.setInt(3, productIDs[i]);
+                            stmtItem.setInt(4, quantities[i]);
+                            stmtItem.setInt(5, cout);
+                            
+                            
+                            rs = stmtItem.executeUpdate();
+                        
+                            if(rs != 1){
+                                throw new IllegalArgumentException();
+                            }
+                            
+                            item++;
+                        }
+                        
+                        connection.commit();
+                        
 		} catch(Exception e){
                     
                 }
+                
+            
             
 	}
 
